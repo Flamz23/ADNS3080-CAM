@@ -144,7 +144,6 @@ void setup() {
 }
 
 void loop() {
-  Serial.print(">FRAME,"); // >FRAME,[frame data]/q
   sensor_frame_capture();
-  Serial.println("/q");
+  Serial.println();
 }
