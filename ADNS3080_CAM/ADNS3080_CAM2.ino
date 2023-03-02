@@ -52,15 +52,28 @@
 
 
 // SPI pin assignment
-#define SPI_SCLK 13
-#define SPI_MISO 12
-#define SPI_MOSI 11
-#define SPI_CS 10                       // chip-select
-
+const int SPI_SCLK = 13;
+const int SPI_MISO = 12;
+const int SPI_MOSI = 11;
+const int SPI_CS = 10;                  // chip-select
+const int RESET_PIN = 9;
 
 SPISettings spiConfig(2000000, MSBFIRST, SPI_MODE3);      //spi config 2MHz clk
 
 
+
+
+
+
+void setup(void)
+{
+
+}
+
+void loop(void)
+{
+
+}
 
 
 // writes byte to device register
@@ -79,41 +92,43 @@ void SpiWrite(byte addr, byte data)
 
 
 // reads byte from device register
-byte SpiRead(byte addr) 
+void SpiRead(byte addr, byte *data, int length) 
 {
-  const byte response;
   SPI.beginTransaction(spiConfig);
   digitalWrite(SPI_CS, LOW);
 
   SPI.transfer(addr &= ~BIT_7);     // Clear bit 7 to read
-  delayMicroseconds(75);            // wait minimum 75 us
-  response = SPI.transfer(0xff);    // write dummy and read response
+  delayMicroseconds(75);            // wait minimum 75 us in case writing to Motion or Motion_Burst registers 
+  memset(data, 0, length);          // Make sure data buffer is 0
+  SPI.transfer(data, length);       // Write data
 
   digitalWrite(SPI_CS, HIGH);
   SPI.endTransaction();
 }
 
 
-int DeviceInit(void)
+int SensorInit(void)
 {
 
 }
+
+
+// resets the sensor by pulling the reset pin high
+void SensorReset() {
+  digitalWrite(RESET_PIN, HIGH);
+  delay(1);                         // reset pulse >10us
+  digitalWrite(RESET_PIN, LOW);
+  delay(35);                        // 35ms from reset to functional
+}
+
+
 
 // return Motion, Delta_X, Delta_Y, SQUAL, Shutter_Upper, 
 // Shutter_Lower and Maximum_Pixel very quickly
-byte* BurstMotion(void)
+void BurstMotion(void)
 {
-  const defVal = SpiRead(ADNS3080_MOTION_BRST);
-}
+  byte motionData[6]; 
+  SpiRead(ADNS3080_MOTION_BRST, motionData, 6);
 
-
-
-void setup(void)
-{
-
-}
-
-void loop(void)
-{
-
+  delay(10);                        // tbexit >10 to leave burst mode
 }
