@@ -1,128 +1,84 @@
-// #include <SPI.h> 
+/**
+ * 
+ *  Arduino ADNS3080 Driver
+ * 
+*/
 
-// // configure spi for 2MHz max speed, data order and spi mode
-// SPISettings spiSettings(2000000, MSBFIRST, SPI_MODE3);
+#include <SPI.h> 
+# include "ports.h"
 
-// // register for motion burst(fastest capture to motion mode)
-// #define ADNS3080_CONFIGURATION_BITS 0x0a
-// #define ADNS3080_DATA_OUT_LOWER 0x0c
-// #define ADNS3080_DATA_OUT_UPPER 0x0d
-// #define ADNS3080_DELTA_X  0x03
-// #define ADNS3080_DELTA_Y  0x04
-// #define ADNS3080_EXTENDED_CONFIG  0x0b
-// #define ADNS3080_FRAME_CAPTURE  0x13
-// #define ADNS3080_FRAME_PERIOD_LOWER 0x10
-// #define ADNS3080_FRAME_PERIOD_MAX_BOUND_LOWER 0x19
-// #define ADNS3080_FRAME_PERIOD_MAX_BOUND_UPPER 0x1a
-// #define ADNS3080_FRAME_PERIOD_MIN_BOUND_LOWER 0x1b
-// #define ADNS3080_FRAME_PERIOD_MIN_BOUND_UPPER 0x1c
-// #define ADNS3080_FRAME_PERIOD_UPPER 0x11
-// #define ADNS3080_INVERSE_PRODUCT_ID 0x3f
-// #define ADNS3080_MAXIMUM_PIXEL  0x07
-// #define ADNS3080_MOTION 0x02
-// #define ADNS3080_MOTION_BURST 0x50
-// #define ADNS3080_MOTION_CLEAR 0x12
-// #define ADNS3080_OBSERVATION 0x3d
-// #define ADNS3080_PIXEL_BURST 0x40
-// #define ADNS3080_PIXEL_SUM 0x06
-// #define ADNS3080_PRODUCT_ID 0x00
-// #define ADNS3080_PRODUCT_ID_VALUE 0x17 // ADNS3080_PRODUCT_ID register
-// #define ADNS3080_REVISION_ID 0x01
-// #define ADNS3080_SHUTTER_LOWER 0x0e
-// #define ADNS3080_SHUTTER_MAX_BOUND_LOWER 0x1e
-// #define ADNS3080_SHUTTER_MAX_BOUND_UPPER 0x1e
-// #define ADNS3080_SHUTTER_UPPER 0x0f
-// #define ADNS3080_SQUAL 0x05
-// #define ADNS3080_SROM_ENABLE 0x14
-// #define ADNS3080_SROM_ID 0x1f
-// #define ADNS3080_SROM_LOAD 0x60
-
-// #define ADNS3080_PIXELS_X 30
-// #define ADNS3080_PIXELS_Y 30
-
-// /* refer to https://www.arduino.cc/en/reference/SPI for spi connection conventions */
-// const int RESET_PIN = 9;
-// const int SS_PIN = SS; // Pin 10 Slave select pin (NCS on board) [Active low]
-// int x, y;
+#define BIT_0 0x01         // bit 0 (0000 0001)
+#define BIT_1 0x02         // bit 1 (0000 0010)
+#define BIT_2 0x04         // bit 2 (0000 0100)
+#define BIT_3 0x08         // bit 3 (0000 1000)
+#define BIT_4 0x10         // bit 4 (0001 0000)
+#define BIT_5 0x20         // bit 5 (0010 0000)
+#define BIT_6 0x40         // bit 6 (0100 0000)
+#define BIT_7 0x80         // bit 7 (1000 0000)
 
 
+#define ADNS3080_PRDT_ID     0x00
+#define ADNS3080_PRDT_ID_INV 0x3f
+#define ADNS3080_REV_ID      0x01
 
+#define ADNS3080_MOTION_RD   0x01
+#define ADNS3080_MOTION_CLR  0x12
+#define ADNS3080_MOTION_BRST 0x50
+#define ADNS3080_DELTA_X     0x03
+#define ADNS3080_DELTA_Y     0x04
+#define ADNS3080_SQUAL       0x05     // surface quality
 
+#define ADNS3080_PXL_SUM     0x06
+#define ADNS3080_PXL_MAX     0x07
+#define ADNS3080_PXL_BRST    0x40
 
+#define ADNS3080_CONFIG_A    0x0a     // R_W
+#define ADNS3080_CONFIG_B    0x0b     // R_W
 
+#define ADNS3080_DATA_LW     0x0c
+#define ADNS3080_DATA_UP     0x0d
+#define ADNS3080_SHTR_LW     0x0e
+#define ADNS3080_SHTR_UP     0x0f
+#define ADNS3080_SHTR_MAX_LW 0x1d     // R_W
+#define ADNS3080_SHTR_MAX_UP 0x1e     // R_W
 
-// void sensor_reset() {
-//   digitalWrite(RESET_PIN, HIGH);
-//   delay(1); // reset pulse >10us
-//   digitalWrite(RESET_PIN, LOW);
-//   delay(35); // 35ms from reset to functional
-// }
+#define ADNS3080_FCAPTURE    0x13     // R_W
+#define ADNS3080_FPERIOD_LW  0x10
+#define ADNS3080_FPERIOD_UP  0x11
+#define ADNS3080_FPERIOD_MAX_LW 0x19  // R_W
+#define ADNS3080_FPERIOD_MAX_UP 0x1a  // R_W
+#define ADNS3080_FPERIOD_MIN_LW 0x1b  // R_W
+#define ADNS3080_FPERIOD_MIN_UP 0x1c  // R_W
 
-// //Verify that the serial communications link is functional
-// int sensor_init() {
-//   unsigned int pid = spiRead(ADNS3080_PRODUCT_ID); // Send dummy value
+#define ADNS3080_SROM_EN     0x14
+#define ADNS3080_SROM_ID     0x1f
+#define ADNS3080_SROM_LD     0x60
+#define ADNS3080_OBS         0x3d     // R_W
 
-//   if (pid == ADNS3080_PRODUCT_ID_VALUE)
-//     Serial.println("ADNS-3080 found");
-//   else {
-//     Serial.print("Could not find ADNS-3080: ");
-//     Serial.println(pid, HEX);
-//     while (1) {}; // Halt program
-//   }
+#define ADNS3080_SROM_LEN    1986
+#define ADNS3080_PIXELS_X    30
+#define ADNS3080_PIXELS_Y    30
+#define SENSOR_MODE          0        // 0 = frame capture, 1 = motion
 
-//   unsigned int conf = spiRead(ADNS3080_CONFIGURATION_BITS); // default value [0x09]
-//   spiWrite(ADNS3080_CONFIGURATION_BITS, conf | 0x10); // Set resolution to 1600 counts per inch
-//   return 0;
-// }
+// SPI pin assignment
+const int SPI_SCLK = 13;
+const int SPI_MISO = 12;
+const int SPI_MOSI = 11;
+const int SPI_CS = 10;
+const int RESET_PIN = 9;
 
-// int sensor_frame_capture() {
-//   bool isFirstPixel = true;
-//   spiWrite(ADNS3080_FRAME_CAPTURE, 0x83); // Write 0x83 to frame capture register to start capturing frame
+struct
+{
+  char motion = 0;
+  static int x, y;
+  int dx, dy = 0;
+  unsigned int sQual = 0;
+  unsigned int shutterUp = 0;
+  unsigned int shutterLw = 0;
+  unsigned int maxPixel = 0;
+}motionData;
 
-//   // Wait 3 frame periods + 10 nanoseconds for frame to be captured
-//   delayMicroseconds(1510); // Minimum frame speed is 2000 frames/second so 1 frame = 500 nano seconds. So 500 x 3 + 10 = 1510
-
-//   // write pixel data to serial
-//   for (int i = 0; i < ADNS3080_PIXELS_Y; i++) {
-//     for (int j = 0; j < ADNS3080_PIXELS_X; j++) {
-//       // read frame capture register (register returns zero byte if frame capture is not complete)
-//       uint8_t regValue = spiRead(ADNS3080_FRAME_CAPTURE);
-      
-//       if (isFirstPixel && !(regValue & 0x40)) { 
-//         Serial.println("Failed to find first pixel");
-//         return -1;
-//       }
-
-//       isFirstPixel = false;
-//       uint8_t pixelValue = regValue << 2; // Only lower 6 bits have data ("& 0x3f" nulls last 2 digita and "<< 2" shifts)
-//       Serial.write(pixelValue);
-//     }
-//     Serial.flush();
-//   }
-//   return 0;
-// }
-
-
-// unsigned int spiRead(byte reg) {
-//   SPI.beginTransaction(spiSettings);
-//   digitalWrite(SS_PIN, LOW);
-//   SPI.transfer(reg);          // Send register address
-//   delayMicroseconds(75);      // Wait minimum 75 us in case writing to Motion or Motion_Burst registers
-//   const int response = SPI.transfer(0xff); // Transfer data and read response
-//   digitalWrite(SS_PIN, HIGH);
-//   SPI.endTransaction();
-//   return response;
-// }
-
-// void spiWrite(byte reg, int data) {
-//   SPI.beginTransaction(spiSettings);
-//   digitalWrite(SS_PIN, LOW);
-//   SPI.transfer(reg | 0x80); // Send register address
-//   delayMicroseconds(1);  // Wait minimum 1 us
-//   SPI.transfer(data); // Transfer data
-//   digitalWrite(SS_PIN, HIGH);
-//   SPI.endTransaction();
-// }
+SPISettings spiConfig(2000000, MSBFIRST, SPI_MODE3); //spi config 2MHz clk
 
 
 
@@ -131,19 +87,183 @@
 
 
 
-// void setup() {
-//   pinMode(RESET_PIN, OUTPUT);
+void setup(void)
+{
+  Serial.begin(115200);
+  while (!Serial);                  // Wait for serial port to open
+  SPI.begin();
 
-//   Serial.begin(115200);
-//   while (!Serial) {}; // Wait for serial port to open
-//   SPI.begin();
+  // Set CS and reset pin as output
+  pinMode(SPI_CS, OUTPUT);
+  pinMode(RESET_PIN, OUTPUT);
 
-//   sensor_reset();
-//   sensor_init();
-//   Serial.println();
-// }
+  SensorReset();
+  SensorInit();
+}
 
-// void loop() {
-//   sensor_frame_capture();
-//   Serial.println();
-// }
+
+void loop(void)
+{
+#if SENSOR_MODE == 0
+  FrameCapture();
+#else
+  BurstMotion();
+#endif
+}
+
+
+// writes char to device register
+void SpiWrite(char addr, char data) 
+{
+  SPI.beginTransaction(spiConfig);
+  digitalWrite(SPI_CS, LOW);
+
+  SPI.transfer(addr |= BIT_7);      // set bit 7 to write
+  delayMicroseconds(1);             // wait minimum 1 us
+  SPI.transfer(data);               // write data
+
+  digitalWrite(SPI_CS, HIGH);
+  SPI.endTransaction(); //delay?
+}
+
+
+// reads char from device register
+void SpiRead(char addr, char *data, int length) 
+{
+  SPI.beginTransaction(spiConfig);
+  digitalWrite(SPI_CS, LOW);
+
+  SPI.transfer(addr &= ~BIT_7);     // Clear bit 7 to read
+  delayMicroseconds(75);            // wait minimum 75 us in case writing to Motion or Motion_Burst registers 
+  memset(data, 0, length);          // Make sure data buffer is 0
+  SPI.transfer(data, length);       // Write data
+
+  digitalWrite(SPI_CS, HIGH);
+  SPI.endTransaction();
+}
+
+
+int SensorInit(void)
+{
+  char productID, configA, configB;
+
+  SpiRead(ADNS3080_PRDT_ID, productID, 1);
+  if (productID == 0x17)
+  {
+    Serial.println("ADNS-3080 found");
+  } else 
+  {
+    Serial.print("Could not find ADNS-3080: ");
+    Serial.println(productID, HEX);
+    while (1) {};                   // Halt program
+  }
+
+  // save current config
+  SpiRead(ADNS3080_CONFIG_A, configA, 1);
+  SpiRead(ADNS3080_CONFIG_B, configB, 1);
+}
+
+
+// resets the sensor by pulling the reset pin high
+void SensorReset(void) 
+{
+  digitalWrite(RESET_PIN, HIGH);
+  delay(1);                         // reset pulse >10us
+  digitalWrite(RESET_PIN, LOW);
+  delay(35);                        // 35ms from reset to functional
+}
+
+
+// returns Motion, Delta_X, Delta_Y, SQUAL, Shutter_Upper, 
+// Shutter_Lower and Maximum_Pixel very quickly
+void BurstMotion(void)
+{
+  char buf[7]; 
+  SpiRead(ADNS3080_MOTION_BRST, buf, 7);
+
+  motionData.motion = buf[0];
+  motionData.dx = buf[1];
+  motionData.dy = buf[2];
+  motionData.x += motionData.dx;
+  motionData.y += motionData.dy;
+  motionData.sQual = buf[3];
+  motionData.shutterUp = buf[4];
+  motionData.shutterLw = buf[5];
+  motionData.maxPixel = buf[6];
+  delayMicroseconds(4);          // tbexit >4µs to leave burst mode
+}
+
+
+// clears Delta_X, Delta_Y, and internal motion registers  ?check timing
+void ClearMotion() {
+  SpiWrite(ADNS3080_MOTION_CLR, 0xFF); // Clear motion reg
+  motionData.x = motionData.y = 0;
+}
+
+
+// download a full array of pixel values from a single frame
+void FrameCapture(void)
+{
+  char buf;
+  bool isFirstPixel = true;
+  // write to the Frame_Capture register to trigger capture
+  SpiWrite(ADNS3080_FCAPTURE, 0x83);
+  
+  // Wait 3 frame periods + 10 nanoseconds for frame to be captured
+  delayMicroseconds(1510); // tCAPTURE = 10µs + 3 frame period (1fp = 500us)
+
+  // each frame is 30 x 30 pixels
+  int i, j;
+  for (i = 0; i < 30; i++)
+  {
+    for (i = 0; j < 30; j++)
+    {
+      SpiRead(ADNS3080_FCAPTURE, buf, 1);
+      if (isFirstPixel && !(buf & BIT_6)) // validate first pixel 
+      {
+        Serial.println("Failed to find first pixel");
+        SensorReset();
+        return;
+      }
+      isFirstPixel = false;
+      Serial.print(buf &= ~(BIT_7|BIT_6), HEX); // clear bit 6 and 7; only used for error checking
+    }
+  }
+  SensorReset();  // hardware reset is required to restore navigation
+  Serial.println();
+  Serial.flush();
+}
+
+
+// load firmwire file to the device
+void SROMDownload (char *data)
+{
+  int i;
+  char res;
+  SensorReset();
+  SpiWrite(0x20, 0x44);
+  SpiWrite(0x23, 0x07);
+  SpiWrite(0x24, 0x88);
+  delayMicroseconds(500)            // Wait at least 1 frame period
+  SpiWrite(ADNS3080_SROM_EN, 0x18); // SROM enable
+  delayMicroseconds(7);
+
+  for (i = 0; i < ADNS3080_SROM_LEN; i++) 
+  {
+    SpiWrite(data, 0x18);
+    delayMicroseconds(7);           // tload >= 4us
+  }
+  delayMicroseconds(4);             // tbexit >4µs to leave burst mode
+
+  SpiRead(ADNS3080_SROM_ID, res, 1); // read srom id reg to validate
+  if (res==0x00)
+  {
+    Serial.print("Firmware load failed");
+  }else {
+    Serial.print("Firmware upload successful: ");
+    Serial.print(res, HEX);
+  }
+  SensorReset();
+}
+
+
